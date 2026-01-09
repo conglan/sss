@@ -5,6 +5,6 @@
   "server": {
     "url": "http://m.wms.strong-tc.com",
     "cleartext": true,
-    "androidScheme": "http"
+    "allowNavigation": ["*"]
   }
 }

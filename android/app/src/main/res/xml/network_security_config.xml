@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 基础配置：允许明文流量 -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
+    
+    <!-- 公司内网域名配置 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">wms.strong-tc.com</domain>
+        
+        <!-- 常见内网IP段 -->
+        <domain includeSubdomains="true">192.168.1.100</domain>
+        <domain includeSubdomains="true">10.0.0.100</domain>
+        <domain includeSubdomains="true">172.16.1.100</domain>
+        
+        <!-- 内网网段 -->
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">172.16.0.0</domain>
+        <domain includeSubdomains="true">172.17.0.0</domain>
+        
+        <!-- 本地地址 -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">::1</domain>
+    </domain-config>
+    
+    <!-- 针对特定端口的公司内网系统 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 如果你有特定的内网系统端口，可以在这里配置 -->
+        <domain includeSubdomains="true">192.168.1.100:8080</domain>
+        <domain includeSubdomains="true">192.168.1.100:8090</domain>
+        <domain includeSubdomains="true">10.0.0.100:8080</domain>
+        <domain includeSubdomains="true">10.0.0.100:8090</domain>
+    </domain-config>
+</network-security-config>
