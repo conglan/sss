@@ -23,34 +23,34 @@ jobs:
         run: |
           npm install
           mkdir -p www
-          # 初始化原生安卓平台
           npx cap add android
 
       - name: Generate App Icons
         run: |
           if [ -f "icon.png" ]; then
-            # 1. 必须建立工具预期的目录结构
             mkdir -p resources/android
-            # 2. 复制图标到工具默认路径
             cp icon.png resources/icon.png
             cp icon.png resources/android/icon.png
-            
-            # 3. 安装并运行生成工具
             npm install -g cordova-res
             cordova-res android --skip-config --copy
-            echo "图标生成成功"
-          else
-            echo "未找到 icon.png，使用默认图标"
+            echo "Icon generation completed."
           fi
 
-      - name: Configure Android Permissions
+      - name: Configure Android Permissions & Iframe Fix
         run: |
-          # 核心：开启 HTTP 明文传输 (解决 Android 10 无法访问内网地址的问题)
+          # 1. 允许 HTTP 明文传输
           sed -i '/<application/a \        android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
           
-          # 强制指定 SDK 版本适配 Android 10 (API 29)
+          # 2. 强制指定 SDK 版本适配 Android 10
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
+          
+          # 3. 注入 Java 代码修复 iframe 和混合内容加载
+          JAVA_PATH="android/app/src/main/java/com/strong/mobile/capacitor/v1/MainActivity.java"
+          
+          # 使用 sed 在 MainActivity 类中注入 onStart 方法来配置 WebView
+          # 这段代码会开启混合内容允许、DOM 存储和跨域访问权限
+          sed -i '/public class MainActivity extends BridgeActivity {/a \    @Override\n    public void onStart() {\n        super.onStart();\n        android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();\n        android.webkit.WebSettings settings = webView.getSettings();\n        settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        settings.setDomStorageEnabled(true);\n        settings.setJavaScriptEnabled(true);\n        settings.setAllowFileAccessFromFileURLs(true);\n        settings.setAllowUniversalAccessFromFileURLs(true);\n    }' $JAVA_PATH
 
       - name: Sync Capacitor
         run: npx cap sync android
