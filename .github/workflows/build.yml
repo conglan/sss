@@ -23,25 +23,32 @@ jobs:
         run: |
           npm install
           mkdir -p www
+          # 初始化原生安卓平台
           npx cap add android
 
       - name: Generate App Icons
         run: |
-          # 检查根目录是否有 icon.png
           if [ -f "icon.png" ]; then
-            # 安装图标生成工具
+            # 1. 必须建立工具预期的目录结构
+            mkdir -p resources/android
+            # 2. 复制图标到工具默认路径
+            cp icon.png resources/icon.png
+            cp icon.png resources/android/icon.png
+            
+            # 3. 安装并运行生成工具
             npm install -g cordova-res
-            # 自动缩放并切图 (适配 517x517 等非标尺寸)
             cordova-res android --skip-config --copy
+            echo "图标生成成功"
           else
-            echo "No icon.png found, using default Capacitor icon."
+            echo "未找到 icon.png，使用默认图标"
           fi
 
       - name: Configure Android Permissions
         run: |
-          # 允许 HTTP 访问
-          sed -i '/<application/a \    android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
-          # 适配 Android 10 (API 29)
+          # 核心：开启 HTTP 明文传输 (解决 Android 10 无法访问内网地址的问题)
+          sed -i '/<application/a \        android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
+          
+          # 强制指定 SDK 版本适配 Android 10 (API 29)
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
 
