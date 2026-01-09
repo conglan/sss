@@ -33,24 +33,51 @@ jobs:
             cp icon.png resources/android/icon.png
             npm install -g cordova-res
             cordova-res android --skip-config --copy
-            echo "Icon generation completed."
           fi
 
-      - name: Configure Android Permissions & Iframe Fix
+      - name: Android 10 Deep Tuning
         run: |
-          # 1. 允许 HTTP 明文传输
+          # 1. 权限与网络适配
           sed -i '/<application/a \        android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
-          
-          # 2. 强制指定 SDK 版本适配 Android 10
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
           
-          # 3. 注入 Java 代码修复 iframe 和混合内容加载
+          # 2. 注入 Java 深度优化代码
           JAVA_PATH="android/app/src/main/java/com/strong/mobile/capacitor/v1/MainActivity.java"
           
-          # 使用 sed 在 MainActivity 类中注入 onStart 方法来配置 WebView
-          # 这段代码会开启混合内容允许、DOM 存储和跨域访问权限
-          sed -i '/public class MainActivity extends BridgeActivity {/a \    @Override\n    public void onStart() {\n        super.onStart();\n        android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();\n        android.webkit.WebSettings settings = webView.getSettings();\n        settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        settings.setDomStorageEnabled(true);\n        settings.setJavaScriptEnabled(true);\n        settings.setAllowFileAccessFromFileURLs(true);\n        settings.setAllowUniversalAccessFromFileURLs(true);\n    }' $JAVA_PATH
+          # 构造深度优化的 Java 代码块
+          # 包含：Cookie 允许、硬件加速、缓存目录开启、跨域权限
+          cat <<EOF > tuning_code.txt
+    @Override
+    public void onStart() {
+        super.onStart();
+        android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();
+        android.webkit.WebSettings settings = webView.getSettings();
+        
+        // 基础权限
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        
+        // Android 10 特定调优：解决混合模式与 iframe 跨域
+        settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
+        
+        // 性能调优：开启硬件加速
+        webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+        
+        // Cookie 深度调优：允许第三方 Cookie (针对 iframe 里的登录)
+        android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        cookieManager.setAcceptThirdPartyCookies(webView, true);
+        
+        // UA 伪装：让 iframe 认为这是标准手机浏览器
+        settings.setUserAgentString("Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+    }
+EOF
+          # 将代码块插入到 MainActivity 类中
+          sed -i '/public class MainActivity extends BridgeActivity {/r tuning_code.txt' $JAVA_PATH
 
       - name: Sync Capacitor
         run: npx cap sync android
