@@ -28,32 +28,54 @@ jobs:
       - name: Generate App Icons Only
         run: |
           if [ -f "icon.png" ]; then
-            # 1. 建立工具预期的目录结构
             mkdir -p resources/android
-            # 2. 复制图标到工具默认路径
             cp icon.png resources/icon.png
             cp icon.png resources/android/icon.png
-            
-            # 3. 安装并运行生成工具 (强制只处理图标 --type icon)
             npm install -g cordova-res
             cordova-res android --skip-config --copy --type icon
             echo "图标生成成功"
-          else
-            echo "未找到 icon.png，跳过图标生成"
           fi
 
       - name: Android 10 Deep Tuning
         run: |
-          # 允许 HTTP 明文传输
+          # 1. 修改 AndroidManifest 和版本配置
           sed -i '/<application/a \        android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
-          # 适配 Android 10 (API 29)
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
           
-          # 注入 Java 代码修复 iframe 和 WebView 兼容性
+          # 2. 直接重写 MainActivity.java，确保语法 100% 正确
           JAVA_PATH="android/app/src/main/java/com/strong/mobile/capacitor/v1/MainActivity.java"
-          CODE="\n    @Override\n    public void onStart() {\n        super.onStart();\n        android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();\n        android.webkit.WebSettings settings = webView.getSettings();\n        settings.setJavaScriptEnabled(true);\n        settings.setDomStorageEnabled(true);\n        settings.setDatabaseEnabled(true);\n        settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        settings.setAllowFileAccessFromFileURLs(true);\n        settings.setAllowUniversalAccessFromFileURLs(true);\n        webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);\n        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);\n        settings.setUserAgentString(\"Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36\");\n    }"
-          sed -i "/public class MainActivity extends BridgeActivity {/a $CODE" $JAVA_PATH
+          
+          cat <<EOF > $JAVA_PATH
+          package com.strong.mobile.capacitor.v1;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onStart() {
+                  super.onStart();
+                  android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();
+                  android.webkit.WebSettings settings = webView.getSettings();
+                  
+                  // 基础与安全设置
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                  settings.setAllowFileAccessFromFileURLs(true);
+                  settings.setAllowUniversalAccessFromFileURLs(true);
+                  
+                  // 性能与 Cookie
+                  webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+                  android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+                  
+                  // User-Agent 伪装支持 iframe
+                  settings.setUserAgentString("Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+              }
+          }
+          EOF
 
       - name: Sync Capacitor
         run: npx cap sync android
