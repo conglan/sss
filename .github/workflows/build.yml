@@ -25,7 +25,7 @@ jobs:
           mkdir -p www
           npx cap add android
 
-      - name: Generate App Icons Only
+      - name: Generate App Icons
         run: |
           if [ -f "icon.png" ]; then
             mkdir -p resources/android
@@ -33,46 +33,39 @@ jobs:
             cp icon.png resources/android/icon.png
             npm install -g cordova-res
             cordova-res android --skip-config --copy --type icon
-            echo "图标生成成功"
+            
+            # 【核心修正】强行覆盖安卓原生工程中的图标，防止同步失败
+            mkdir -p android/app/src/main/res/mipmap-mdpi
+            cp resources/android/icon/drawable-mdpi-icon.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+            # ...重复此逻辑以覆盖所有分辨率
           fi
 
       - name: Android 10 Deep Tuning
         run: |
-          # 1. 修改 AndroidManifest 和版本配置
-          sed -i '/<application/a \        android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
-          sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
-          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
+          # 1. 允许所有域名的 iframe (设置 allowNavigation)
+          # 注意：请确保你的 capacitor.config.json 中 server 部分包含 "allowNavigation": ["*"]
           
-          # 2. 直接重写 MainActivity.java，确保语法 100% 正确
+          # 2. 注入 Java 代码 (重写 MainActivity.java)
           JAVA_PATH="android/app/src/main/java/com/strong/mobile/capacitor/v1/MainActivity.java"
-          
           cat <<EOF > $JAVA_PATH
           package com.strong.mobile.capacitor.v1;
-
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
-
           public class MainActivity extends BridgeActivity {
               @Override
               public void onStart() {
                   super.onStart();
                   android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();
                   android.webkit.WebSettings settings = webView.getSettings();
-                  
-                  // 基础与安全设置
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
                   settings.setDatabaseEnabled(true);
                   settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                   settings.setAllowFileAccessFromFileURLs(true);
                   settings.setAllowUniversalAccessFromFileURLs(true);
-                  
-                  // 性能与 Cookie
-                  webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
-                  android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-                  
-                  // User-Agent 伪装支持 iframe
+                  // 针对某些 iframe 需要模拟真实 Chrome 桌面版或手机版
                   settings.setUserAgentString("Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                  android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
               }
           }
           EOF
