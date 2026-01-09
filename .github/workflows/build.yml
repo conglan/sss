@@ -25,11 +25,23 @@ jobs:
           mkdir -p www
           npx cap add android
 
-      - name: Configure Android for HTTP & Intranet
+      - name: Generate App Icons
         run: |
-          # 核心步骤：强行开启 Android 10 的 HTTP 访问权限
+          # 检查根目录是否有 icon.png
+          if [ -f "icon.png" ]; then
+            # 安装图标生成工具
+            npm install -g cordova-res
+            # 自动缩放并切图 (适配 517x517 等非标尺寸)
+            cordova-res android --skip-config --copy
+          else
+            echo "No icon.png found, using default Capacitor icon."
+          fi
+
+      - name: Configure Android Permissions
+        run: |
+          # 允许 HTTP 访问
           sed -i '/<application/a \    android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
-          # 设置 Android 10 (API 29) 适配环境
+          # 适配 Android 10 (API 29)
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
 
