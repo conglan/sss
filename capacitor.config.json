@@ -1,0 +1,10 @@
+{
+  "appId": "com.strong.mobile.capacitor.v1",
+  "appName": "思榕移动端",
+  "webDir": "www",
+  "server": {
+    "url": "http://m.wms.strong-tc.com",
+    "cleartext": true,
+    "androidScheme": "http"
+  }
+}
