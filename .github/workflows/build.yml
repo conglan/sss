@@ -25,36 +25,32 @@ jobs:
           mkdir -p www
           npx cap add android
 
-      - name: Generate App Icons and Splash
+      - name: Generate App Icons Only
         run: |
-          # 1. 建立工具预期的完整目录结构
-          mkdir -p resources/android
-          
-          # 2. 处理图标
           if [ -f "icon.png" ]; then
+            # 1. 建立工具预期的目录结构
+            mkdir -p resources/android
+            # 2. 复制图标到工具默认路径
             cp icon.png resources/icon.png
             cp icon.png resources/android/icon.png
+            
+            # 3. 安装并运行生成工具 (强制只处理图标 --type icon)
+            npm install -g cordova-res
+            cordova-res android --skip-config --copy --type icon
+            echo "图标生成成功"
+          else
+            echo "未找到 icon.png，跳过图标生成"
           fi
-          
-          # 3. 处理启动页
-          if [ -f "splash.png" ]; then
-            cp splash.png resources/splash.png
-            cp splash.png resources/android/splash.png
-          fi
-          
-          # 4. 运行生成工具 (不再限制 type，自动处理 icon 和 splash)
-          npm install -g cordova-res
-          cordova-res android --skip-config --copy
-          echo "资源生成完成"
 
       - name: Android 10 Deep Tuning
         run: |
-          # 开启 HTTP 与 SDK 版本适配
+          # 允许 HTTP 明文传输
           sed -i '/<application/a \        android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
+          # 适配 Android 10 (API 29)
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 29/' android/variables.gradle
           
-          # 注入 Java 代码：解决 iframe、Cookie、Vue 存储和身份伪装
+          # 注入 Java 代码修复 iframe 和 WebView 兼容性
           JAVA_PATH="android/app/src/main/java/com/strong/mobile/capacitor/v1/MainActivity.java"
           CODE="\n    @Override\n    public void onStart() {\n        super.onStart();\n        android.webkit.WebView webView = (android.webkit.WebView) this.bridge.getWebView();\n        android.webkit.WebSettings settings = webView.getSettings();\n        settings.setJavaScriptEnabled(true);\n        settings.setDomStorageEnabled(true);\n        settings.setDatabaseEnabled(true);\n        settings.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        settings.setAllowFileAccessFromFileURLs(true);\n        settings.setAllowUniversalAccessFromFileURLs(true);\n        webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);\n        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);\n        settings.setUserAgentString(\"Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36\");\n    }"
           sed -i "/public class MainActivity extends BridgeActivity {/a $CODE" $JAVA_PATH
